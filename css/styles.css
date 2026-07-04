@@ -24,7 +24,7 @@ p { margin: 0; }
   top: 16px;
   width: 308px;
   height: calc(100vh - 32px);
-  min-height: 868px;
+  min-height: 420px; /* панель помещается в экран; контент ниже — листается внутри (.sb-scroll) */
   background: var(--glass);
   border: 1px solid #fff;
   border-radius: 16px;
@@ -346,21 +346,77 @@ p { margin: 0; }
   white-space: nowrap;
 }
 
-/* весь блок размыт: правый край растворяется плавно (виден в раскрытом меню),
-   выносы за левую/нижнюю грани прячут мягкие края под overflow:hidden панели;
-   стопы пересчитаны под новую геометрию — видимый градиент тот же */
-.sb-fade {
+/* ── фейды скролла ──
+   контент растворяет МАСКА на .sb-scroll: сквозь неё виден родной стеклянный фон
+   панели, поэтому цвет фейда совпадает с фоном меню 1 в 1 по построению.
+   Эти оверлеи добавляют backdrop-размытие строк, попавших под верх/низ панели;
+   на пустом фоне они невидимы (размывать нечего) — верхний «появляется» сам,
+   как только контент заезжает под шапку */
+.sb-fade,
+.sb-fade-top {
   position: absolute;
-  left: -25px;
-  bottom: -25px;
-  width: 355px;
-  height: 240px;
-  background: linear-gradient(to bottom, rgba(239, 239, 241, 0) 26%, #efeff1 69%);
-  filter: blur(22px);
+  left: 0;
+  right: 0;
   pointer-events: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
-/* в AI-виде фейд тянется вместе с панелью (вынос вправо прячет размытый край) */
-.sidebar.ai .sb-fade { width: auto; right: -25px; }
+.sb-fade {
+  bottom: 0;
+  height: 150px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 75%);
+  mask-image: linear-gradient(to bottom, transparent, #000 75%);
+}
+.sb-fade-top {
+  top: 0;
+  height: 100px;
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 70%);
+  mask-image: linear-gradient(to top, transparent, #000 70%);
+}
+
+/* ── раздельный скролл меню ── */
+.sb-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* докрутили до края — страница не подхватывает */
+  scrollbar-width: none;
+  /* края растворяются у граней панели; нижние стопы повторяют прежний фейд */
+  -webkit-mask-image: linear-gradient(to bottom,
+      transparent 26px, #000 96px,
+      #000 calc(100% - 165px), transparent calc(100% - 32px));
+  mask-image: linear-gradient(to bottom,
+      transparent 26px, #000 96px,
+      #000 calc(100% - 165px), transparent calc(100% - 32px));
+}
+.sb-scroll::-webkit-scrollbar { display: none; }
+/* холст контента: на высоких экранах равен панели — меню прижато к низу, скролла нет */
+.sb-body { position: relative; height: 100%; }
+/* блок «разделитель + 5 пунктов» единым куском (он же .mv — подъезжает при скрытии кредита) */
+.sb-menu-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 340px;
+}
+/* органы управления шапки — над скролл-контентом (строки уезжают под них) */
+.sb-logo, .sb-logo-ai, .sb-back, .sb-toggle, .sb-burger { z-index: 2; }
+/* экран ниже макета (панель < 868): холст фиксированный 948px (868 макета + 80 выбега),
+   меню встаёт на координаты макета и листается; нижний фейд короче, чтобы последний
+   пункт при полной прокрутке целиком выходил из-под него и пилюли поиска */
+@media (max-height: 899px) {
+  .sb-body { height: 948px; }
+  .sb-menu-block { bottom: auto; top: 528px; }
+  .sb-scroll {
+    -webkit-mask-image: linear-gradient(to bottom,
+        transparent 26px, #000 96px,
+        #000 calc(100% - 108px), transparent calc(100% - 36px));
+    mask-image: linear-gradient(to bottom,
+        transparent 26px, #000 96px,
+        #000 calc(100% - 108px), transparent calc(100% - 36px));
+  }
+}
 
 .sb-search {
   position: absolute;
@@ -397,7 +453,8 @@ p { margin: 0; }
 /* ══════════ AI-вид сайдпанели ══════════ */
 /* контейнеры на всю панель не должны перехватывать клики по кнопкам под ними */
 .sb-main, .sb-ai { position: absolute; inset: 0; pointer-events: none; }
-.sidebar:not(.ai) .sb-main > * { pointer-events: auto; }
+/* кликается только скролл-область (фейды — сквозные); её потомки наследуют auto */
+.sidebar:not(.ai) .sb-main > .sb-scroll { pointer-events: auto; }
 .sidebar.ai .sb-ai > * { pointer-events: auto; }
 .sb-main {
   opacity: 1;
@@ -436,8 +493,8 @@ p { margin: 0; }
 /* ══════════ Мультибанк: клик по балансу раскрывает остатки по банкам ══════════ */
 .sb-multibank { cursor: pointer; }
 /* обёртки на всё крыло не перехватывают клики (тот же паттерн, что .sb-main/.sb-ai) */
-.sidebar .sb-main > .sb-below,
-.sidebar .sb-main > .sb-bankview { position: absolute; inset: 0; pointer-events: none; }
+.sidebar .sb-body > .sb-below,
+.sidebar .sb-body > .sb-bankview { position: absolute; inset: 0; pointer-events: none; }
 .sidebar:not(.ai):not(.banks) .sb-below > * { pointer-events: auto; }
 .sidebar.banks:not(.ai) .sb-bankview > * { pointer-events: auto; }
 .sb-below {
@@ -472,8 +529,8 @@ p { margin: 0; }
               transform 0.55s cubic-bezier(0.32, 0.72, 0, 1);
   transition-delay: calc(120ms + var(--i, 0) * 30ms);
 }
-/* круглые логотипы банков (кропы как у мини-кластера баланса) */
-.sb-ico.bank { border-radius: 50%; overflow: hidden; background: #fff; }
+/* логотипы банков — суперэллипс se40 (как у счетов), кропы как у мини-кластера баланса */
+.sb-ico.bank { background: #fff; }
 .sb-ico.bank img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
 /* лого «А» ⇄ стрелка назад (тот же кроссфейд, что лого ⇄ AI-лого) */
 .sb-back {
