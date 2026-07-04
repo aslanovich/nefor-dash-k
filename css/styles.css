@@ -10,7 +10,7 @@ html, body {
   background: var(--page-bg);
   font-family: var(--font);
   color: var(--text-primary);
-  min-width: 1280px;
+  min-width: 1372px; /* 324 меню + 960 контент + 88 зона кружков */
 }
 
 img { display: block; }
@@ -732,7 +732,8 @@ p { margin: 0; }
 }
 
 /* ══════════ Каркас контента ══════════ */
-main { margin-left: 324px; }
+/* контент центрируется между меню (дефолтные 308+16) и началом кружков справа (24+64) */
+main { margin-left: 324px; margin-right: 88px; }
 
 .content {
   position: relative;
