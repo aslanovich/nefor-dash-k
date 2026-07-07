@@ -353,8 +353,21 @@
 body { --twk: 0px; }
 body.twk-open { --twk: 320px; }
 
-/* [Next] Старый механизм «панель толкает/скейлит .content» убран — теперь при открытой
-   панели масштабируется ВЕСЬ борд (.board) в рамку (styles/tools.css), поля вокруг чёрные. */
+/* панель толкает контент: main ужимается, кружки и FAB уезжают влево */
+main {
+  margin-right: calc(88px + var(--twk));
+  transition: margin-right 0.55s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.rail {
+  right: calc(24px + var(--twk));
+  transition: right 0.55s cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* контент фикс-ширины 960 плавно масштабируется под остаток (--csc ставит JS) */
+.content {
+  transform-origin: 50% 0;
+  transition: transform 0.55s cubic-bezier(0.32, 0.72, 0, 1);
+}
+body.twk-open .content { transform: scale(var(--csc, 1)); }
 
 /* «вырубка»: экран заливается чёрным, борд остаётся в окне-«дырке» — сам
    .twk-frame и есть прозрачная дырка, а огромная box-shadow заливает всё вокруг.

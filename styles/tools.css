@@ -1,0 +1,112 @@
+/* ═══════════ Общая tools-панель: добавления к твикеру (.twk* берём из menu2.css) ═══════════
+   Здесь только НОВОЕ: селектор дашбордов (карточки), сегмент v1/v2, подсказка,
+   и масштаб контента Current при открытой панели. Панель-«шелл» (.twk/.twk-frame/
+   .twk-fab/.twk-row/.twk-sw) и push/scale Главной живут в menu2.css (грузится глобально). */
+
+.twk {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.twk::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── карточки-селектор дашборда ── */
+.twk-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.twk-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.twk-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.twk-card.active {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+.twk-card-t {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+}
+.twk-card-s {
+  font-size: 12px;
+  line-height: 16px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── сегмент v1 / v2 ── */
+.twk-seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.twk-seg button {
+  flex: 1;
+  height: 32px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+.twk-seg button.active {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.twk-hint {
+  margin-top: 20px;
+  font-size: 13px;
+  line-height: 19px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.twk-hint b {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+}
+
+/* ── Рамка при открытой панели: вьюпорт борда ОБРЕЗАЕТСЯ до окна слева от панели ──
+   .board — обёртка дашборда, всегда fixed-скролл-контейнер (свой скролл вместо оконного).
+   Открытая панель: чёрный фон html вокруг + clip-path отсекает всё вне окна.
+   Содержимое НЕ масштабируется (1:1), лишнее по краям просто обрезается. */
+.board {
+  position: fixed;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--page-bg);
+  clip-path: inset(0 round 0);
+  transition: clip-path 0.55s cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* фон вьюпорта (вокруг обрезанного борда) — на html: всё содержимое body — fixed,
+   поэтому фон body не заливает экран. Класс twk-open ставится и на documentElement. */
+html {
+  transition: background-color 0.5s ease;
+}
+html.twk-open {
+  background: #0c0c0f; /* чёрные поля вокруг обрезанного борда */
+}
+/* обрезка вьюпорта: inset(верх право низ лево). Справа PANEL(320)+зазор(12)=332, остальные 12. */
+body.twk-open .board {
+  clip-path: inset(12px 332px 12px 12px round 20px);
+}
