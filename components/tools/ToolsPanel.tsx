@@ -45,7 +45,7 @@ export default function ToolsPanel() {
             className={"twk-card" + (dashboard === "main" ? " active" : "")}
             onClick={() => router.push("/")}
           >
-            <span className="twk-card-t">Предприниматель</span>
+            <span className="twk-card-t">ИП</span>
             <span className="twk-card-s">Концепт</span>
           </button>
           <button
