@@ -212,7 +212,7 @@ export default function CurrentPage() {
       <main className="cur-main">
         <div className="cur-content">
           {/* ── Быстрые действия ── */}
-          <section className="cur-qa">
+          <section className="cur-qa" data-ai-block="Быстрые действия">
             <a className="cur-qa-btn">
               <span className="cur-qa-ico">
                 <img src={`${A}curQaTopup.svg`} width="20" height="20" alt="" />
@@ -251,7 +251,7 @@ export default function CurrentPage() {
           {/* ── 1-й ряд: баланс + дела в работе + баннеры ── */}
           <section className="cur-row1">
             {/* Баланс */}
-            <div className="cur-balance">
+            <div className="cur-balance" data-ai-block="Баланс">
               <div className="cur-bal-body">
                 <div className="cur-bal-amount">570 880,95 ₽</div>
                 <div className="cur-bal-bottom">
@@ -392,7 +392,7 @@ export default function CurrentPage() {
           </section>
 
           {/* ── Табло: табы + переключатель видимости + карточки онбординга ── */}
-          <section className="cur-tablo-section">
+          <section className="cur-tablo-section" data-ai-block="Табло и задачи">
             <div className="cur-tablo">
               <div className="cur-tablo-tabs">
                 <span className="cur-tab active">С чего начать</span>
@@ -603,7 +603,7 @@ export default function CurrentPage() {
             </button>
           </div>
 
-          <div className="cur-table">
+          <div className="cur-table" data-ai-block="Лента операций">
             {/* шапка */}
             <div className="cur-thead">
               <div className="cur-th cur-th-ctrl">

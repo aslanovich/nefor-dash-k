@@ -13,13 +13,22 @@ export interface NeuroBarOpts {
   left?: string;
   right?: string;
   bottom?: string;
+  activateRef?: RefObject<() => void>;
 }
+
+const VOICE_PHRASES = [
+  "Покажи баланс за последний месяц",
+  "Сделай выписку по счёту",
+  "Какие платежи сейчас в работе",
+  "Сравни тарифы для ИП",
+  "Найди все операции с ООО «Ромашка»",
+];
 
 export function useNeuroBar(
   rootRef: RefObject<HTMLElement | null>,
   opts: NeuroBarOpts = {}
 ) {
-  const { left, right, bottom } = opts;
+  const { left, right, bottom, activateRef } = opts;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -29,9 +38,12 @@ export function useNeuroBar(
 
     // ── элементы (внутри компонента) ──
     const nbar = q<HTMLElement>(".nbar");
+    const nbKey = q<HTMLElement>(".nb-key");
     const nbPill = q<HTMLElement>(".nb-pill");
     const nbInput = q<HTMLInputElement>(".nb-input");
-    const nbGo = q<HTMLButtonElement>(".nb-go");
+    const nbMic = q<HTMLButtonElement>(".nb-mic");
+    const nbPicker = q<HTMLButtonElement>(".nb-picker");
+    const nbEq = q<HTMLElement>(".nb-eq");
     const spot = q<HTMLElement>(".spot");
     const spotInput = q<HTMLInputElement>(".spot-input input");
     const spotClose = q<HTMLElement>(".spot-close");
@@ -50,24 +62,25 @@ export function useNeuroBar(
     function nbActivate() {
       if (nbar.classList.contains("active")) return;
       nbar.classList.add("active");
-      // обнуляем сдвиг магнита, иначе скейл-хлопок (nbPop перебивает transform)
-      // по завершении дёрнет пилюлю обратно на офсет курсора
-      nbPill.style.setProperty("--mx", "0px");
-      nbPill.style.setProperty("--my", "0px");
+      // обнуляем сдвиг магнита клавиши, иначе она уедет с офсетом курсора под низ пилюли
+      nbKey.style.setProperty("--mx", "0px");
+      nbKey.style.setProperty("--my", "0px");
       nbInput.focus();
     }
     function nbCollapse() {
       nbar.classList.remove("active");
       nbInput.value = "";
       nbInput.blur();
+      removeTag();
     }
     function setSpot(open: boolean) {
       spot.classList.toggle("open", open);
       spot.setAttribute("aria-hidden", String(!open));
     }
+    if (activateRef) activateRef.current = nbActivate;
 
-    // ── магнит: строка слегка подъезжает к курсору (плавно, с лагом) ──
-    //    амплитуда вдвое слабее прежней (NB_MAX 13→6.5, коэф. 0.2→0.1)
+    // ── магнит: клавиша слегка подъезжает к курсору, пока строка свёрнута ──
+    //    (плавно, с лагом; амплитуда вдвое слабее прежней — NB_MAX 13→6.5, коэф. 0.2→0.1)
     const NB_R = 210,
       NB_MAX = 6.5;
     let nbLastE: MouseEvent | null = null,
@@ -96,8 +109,8 @@ export function useNeuroBar(
         }
       }
       if (tx || ty || nbMoved) {
-        nbPill.style.setProperty("--mx", tx.toFixed(2) + "px");
-        nbPill.style.setProperty("--my", ty.toFixed(2) + "px");
+        nbKey.style.setProperty("--mx", tx.toFixed(2) + "px");
+        nbKey.style.setProperty("--my", ty.toFixed(2) + "px");
         nbMoved = !!(tx || ty);
       }
     }
@@ -139,9 +152,44 @@ export function useNeuroBar(
       );
     }
 
+    // тег выбранного блока страницы (режим-курсор, п.5) — префикс к вопросу
+    let currentTag: string | null = null;
+    function removeTag() {
+      currentTag = null;
+      nbPill.querySelector(".nb-tag")?.remove();
+    }
+    function addTag(label: string) {
+      currentTag = label;
+      let tag = nbPill.querySelector<HTMLElement>(".nb-tag");
+      if (!tag) {
+        tag = document.createElement("span");
+        tag.className = "nb-tag";
+        const lb = document.createElement("span");
+        lb.className = "nb-tag-lb";
+        const x = document.createElement("button");
+        x.type = "button";
+        x.className = "nb-tag-x";
+        x.setAttribute("aria-label", "Убрать тег блока");
+        x.textContent = "×";
+        x.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          removeTag();
+        });
+        tag.appendChild(lb);
+        tag.appendChild(x);
+        nbPill.insertBefore(tag, nbPill.firstChild);
+      }
+      (tag.querySelector(".nb-tag-lb") as HTMLElement).textContent = label;
+      nbActivate();
+      nbInput.focus();
+    }
+
     // открытие из строки: сброс ленты, вопрос пользователя, генерация ответа
     function openChat() {
-      const query = nbInput.value.trim() || "Мой тариф";
+      const typed = nbInput.value.trim();
+      const query = currentTag
+        ? `[${currentTag}] ${typed || "расскажи подробнее"}`
+        : typed || "Мой тариф";
       setChat(true);
       stopStream();
       chatThread.innerHTML = "";
@@ -346,17 +394,107 @@ export function useNeuroBar(
       return steps;
     }
 
-    // ── обработчики ──
-    // клик по свёрнутой пилюле — разворачивает поле
-    const onPillClick = () => {
-      if (!nbar.classList.contains("active")) nbActivate();
-    };
-    // кнопка справа: свёрнуто — разворачивает, развёрнуто — поднимает чат
-    const onGoClick = (e: MouseEvent) => {
+    // ══════════ Голосовой режим (п.6): mic-кнопка в пилюле ══════════
+    let voiceOn = false;
+    let voiceStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
+    let analyser: AnalyserNode | null = null;
+    let voiceRaf = 0;
+    const eqCols = Array.from(nbEq.querySelectorAll<HTMLElement>(".nb-eq-col"));
+
+    function stopVoice() {
+      if (!voiceOn) return;
+      voiceOn = false;
+      nbar.classList.remove("voice-on");
+      nbMic.classList.remove("active");
+      if (voiceRaf) cancelAnimationFrame(voiceRaf);
+      voiceRaf = 0;
+      voiceStream?.getTracks().forEach((t) => t.stop());
+      voiceStream = null;
+      analyser = null;
+      if (audioCtx) audioCtx.close().catch(() => {});
+      audioCtx = null;
+      eqCols.forEach((c) => c.style.removeProperty("--v"));
+      nbInput.value = VOICE_PHRASES[Math.floor(Math.random() * VOICE_PHRASES.length)];
+      nbActivate();
+      nbInput.focus();
+    }
+    async function startVoice() {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        return; // отказ в доступе — мягкий откат, остаёмся в обычном поле
+      }
+      voiceStream = stream;
+      voiceOn = true;
+      nbActivate();
+      nbar.classList.add("voice-on");
+      nbMic.classList.add("active");
+      audioCtx = new AudioContext();
+      const source = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.75;
+      source.connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        if (!analyser) return;
+        analyser.getByteFrequencyData(data);
+        eqCols.forEach((col, i) => {
+          const v = data[i % data.length] / 255;
+          col.style.setProperty("--v", v.toFixed(3));
+        });
+        voiceRaf = requestAnimationFrame(tick);
+      };
+      tick();
+    }
+    const onMicClick = (e: MouseEvent) => {
       e.stopPropagation();
-      if (nbar.classList.contains("active")) openChat();
-      else nbActivate();
+      if (voiceOn) stopVoice();
+      else startVoice();
     };
+
+    // ══════════ Режим выбора блока (п.5): курсор-клик в пилюле ══════════
+    let pickerOn = false;
+    let hoveredBlock: HTMLElement | null = null;
+
+    const onBlockOver = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>("[data-ai-block]");
+      if (el === hoveredBlock) return;
+      hoveredBlock?.classList.remove("ai-block-hover");
+      hoveredBlock = el;
+      hoveredBlock?.classList.add("ai-block-hover");
+    };
+    const onBlockClick = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement).closest<HTMLElement>("[data-ai-block]");
+      if (!el) return;
+      e.preventDefault();
+      e.stopPropagation();
+      addTag(el.dataset.aiBlock || "");
+      setPicker(false);
+    };
+    function setPicker(on: boolean) {
+      if (pickerOn === on) return;
+      pickerOn = on;
+      document.body.classList.toggle("picker-open", on);
+      nbPicker.classList.toggle("active", on);
+      if (on) {
+        document.addEventListener("mouseover", onBlockOver);
+        document.addEventListener("click", onBlockClick, true);
+      } else {
+        document.removeEventListener("mouseover", onBlockOver);
+        document.removeEventListener("click", onBlockClick, true);
+        hoveredBlock?.classList.remove("ai-block-hover");
+        hoveredBlock = null;
+      }
+    }
+    const onPickerClick = (e: MouseEvent) => {
+      e.stopPropagation();
+      setPicker(!pickerOn);
+    };
+
+    // ── обработчики ──
     // Enter в поле — поднимает чат с введённым запросом
     const onInputKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -364,21 +502,28 @@ export function useNeuroBar(
         openChat();
       }
     };
-    // клик мимо пилюли при пустом поле — сворачивает обратно
+    // клик мимо пилюли при пустом поле (и без тега) — сворачивает обратно.
+    // Клик по самой клавише (.nb-key) тоже считается "внутри" — иначе тот же клик,
+    // что открывает пилюлю (AiKeyButton.onActivate), тут же схлопывает её обратно,
+    // всплыв до document ДО того, как клавиша скрылась по классу .active.
     const onDocClick = (e: MouseEvent) => {
       if (
         nbar.classList.contains("active") &&
         !nbPill.contains(e.target as Node) &&
-        !nbInput.value.trim()
+        !nbKey.contains(e.target as Node) &&
+        !nbInput.value.trim() &&
+        !currentTag
       )
         nbCollapse();
     };
-    // закрытие: крестик или Esc. Esc-цепочка: чат → Spotlight → сворачивание строки
+    // закрытие: крестик или Esc. Esc-цепочка: picker/voice → чат → Spotlight → строка
     const onSpotClose = () => setSpot(false);
     const onChatClose = () => closeChat();
     const onDocKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      if (chat.classList.contains("open")) closeChat();
+      if (pickerOn) setPicker(false);
+      else if (voiceOn) stopVoice();
+      else if (chat.classList.contains("open")) closeChat();
       else if (spot.classList.contains("open")) setSpot(false);
       else if (nbar.classList.contains("active")) nbCollapse();
     };
@@ -389,9 +534,9 @@ export function useNeuroBar(
       }
     };
 
-    nbPill.addEventListener("click", onPillClick);
-    nbGo.addEventListener("click", onGoClick);
     nbInput.addEventListener("keydown", onInputKey);
+    nbMic.addEventListener("click", onMicClick);
+    nbPicker.addEventListener("click", onPickerClick);
     document.addEventListener("click", onDocClick);
     spotClose.addEventListener("click", onSpotClose);
     chatClose.addEventListener("click", onChatClose);
@@ -401,9 +546,9 @@ export function useNeuroBar(
 
     // ── cleanup: снимаем глобальные слушатели, гасим таймеры/rAF (StrictMode/маршруты) ──
     return () => {
-      nbPill.removeEventListener("click", onPillClick);
-      nbGo.removeEventListener("click", onGoClick);
       nbInput.removeEventListener("keydown", onInputKey);
+      nbMic.removeEventListener("click", onMicClick);
+      nbPicker.removeEventListener("click", onPickerClick);
       document.removeEventListener("click", onDocClick);
       spotClose.removeEventListener("click", onSpotClose);
       chatClose.removeEventListener("click", onChatClose);
@@ -412,6 +557,13 @@ export function useNeuroBar(
       window.removeEventListener("mousemove", onMouseMove);
       if (nbRaf) cancelAnimationFrame(nbRaf);
       stopStream();
+      if (pickerOn) setPicker(false);
+      if (voiceOn) {
+        voiceStream?.getTracks().forEach((t) => t.stop());
+        if (voiceRaf) cancelAnimationFrame(voiceRaf);
+        if (audioCtx) audioCtx.close().catch(() => {});
+      }
+      if (activateRef) activateRef.current = () => {};
     };
-  }, [rootRef, left, right, bottom]);
+  }, [rootRef, left, right, bottom, activateRef]);
 }

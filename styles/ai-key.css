@@ -1,0 +1,120 @@
+/* ═══════════ 3D-клавиша «АИ» (порт alfa-ai-button-rounded.html) ═══════════
+   .aik-stage — обёртка: ховер/press-глоу (градиентная заблюренная тень цвета кнопки,
+   п.2) + скролл-параллакс/деформация (п.1, амплитуда от --sv, задаёт useBoardScroll)
+   + свободное перетаскивание (--dx/--dy, пишет AiKeyButton.tsx по pointer-событиям).
+   Классы aik-hovered/aik-pressed/aik-clicked/aik-dragging вешает AiKeyButton.tsx
+   (как в исходном демо — там это был инлайн-скрипт поверх three.js-модуля). Размер —
+   168×161 из демо, уменьшен на 30% дважды подряд (118×113 → 83×79). */
+
+.aik-stage {
+  /* --sv (-1..1, скорость скролла .board, затухает к 0) наследуется от .nb-key,
+     куда пишет useBoardScroll — здесь НЕ переобъявлять, иначе перекроет наследование.
+     --dx/--dy — перетаскивание, копится в AiKeyButton.tsx, по умолчанию 0. */
+  position: relative;
+  width: 83px;
+  height: 79px;
+  isolation: isolate;
+  overflow: visible;
+  pointer-events: auto;
+  transform: translate(var(--dx, 0px), var(--dy, 0px));
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1), transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* во время перетаскивания клавиша должна следовать за курсором без задержки */
+.aik-stage.aik-dragging {
+  transition: opacity 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* глоу под кнопкой — те же цвета, что в side/top клавиши (розовый + золотой) */
+.aik-stage::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 8px;
+  right: 6px;
+  bottom: 1px;
+  height: 24px;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 50% 58%, rgba(255, 77, 126, 0.66) 0%, rgba(255, 77, 126, 0.42) 34%, transparent 68%),
+    radial-gradient(ellipse at 52% 78%, rgba(242, 188, 31, 0.56) 0%, rgba(242, 188, 31, 0.34) 42%, transparent 72%);
+  filter: blur(13px);
+  opacity: 0.2;
+  transform: translateY(8px) scale(0.86);
+  transition: opacity 0.16s ease-out, transform 0.16s ease-out, filter 0.16s ease-out;
+  pointer-events: none;
+}
+.aik-stage.aik-hovered::before {
+  opacity: 0.78;
+  filter: blur(16px);
+  transform: translateY(14px) scale(1.08);
+}
+.aik-stage.aik-pressed::before {
+  opacity: 1;
+  filter: blur(18px);
+  transform: translateY(19px) scale(1.18);
+}
+
+.aik-canvas-mask {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 34px 34px 29px 29px;
+  transform: translateY(0) scale(1);
+  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.25, 1), filter 0.14s ease-out;
+  will-change: transform, filter;
+
+  /* скролл-параллакс + едва заметная деформация: сдвиг и лёгкий skew/scaleY от --sv */
+  translate: 0 calc(var(--sv, 0) * -4px);
+  rotate: calc(var(--sv, 0) * -1.1deg);
+  scale: 1 calc(1 - var(--sv, 0) * 0.012);
+}
+.aik-stage.aik-hovered .aik-canvas-mask {
+  filter: saturate(1.08) contrast(1.02);
+  transform: translateY(1px) scale(1);
+}
+.aik-stage.aik-pressed .aik-canvas-mask {
+  filter: saturate(1.14) brightness(0.98) contrast(1.03);
+  transform: translateY(8px) scale(0.965);
+}
+.aik-stage.aik-clicked .aik-canvas-mask {
+  animation: aik-rebound 340ms cubic-bezier(0.24, 0.86, 0.32, 1);
+}
+@keyframes aik-rebound {
+  0% { transform: translateY(8px) scale(0.965); }
+  48% { transform: translateY(-3px) scale(1.018); }
+  72% { transform: translateY(1px) scale(0.994); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.aik-canvas {
+  width: 83px;
+  height: 79px;
+  display: block;
+  transform: scale(1.015);
+  transform-origin: center center;
+  cursor: grab;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  outline: none;
+}
+.aik-stage.aik-dragging .aik-canvas {
+  cursor: grabbing;
+}
+.aik-canvas:focus-visible {
+  outline: 3px solid #2a5bd7;
+  outline-offset: -6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aik-stage, .aik-stage::before, .aik-canvas-mask {
+    transition: none;
+    animation: none;
+  }
+  .aik-canvas-mask {
+    translate: none;
+    rotate: none;
+    scale: 1;
+  }
+}

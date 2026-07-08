@@ -1,11 +1,15 @@
 "use client";
 import { useRef } from "react";
 import { useNeuroBar, NeuroBarOpts } from "./useNeuroBar";
+import AiKeyButton from "./AiKeyButton";
+import { useBoardScroll } from "./useBoardScroll";
+import "@/styles/ai-key.css";
 import "@/styles/neuro-bar.css";
 
-/* Умная строка нейропомощника: строка (.nbar) + Spotlight (.spot) + фуллскрин-чат (.chat).
-   Разметка — порт шаблонов из js/neuro-bar.js. Поведение — в useNeuroBar.
-   Обёртка display:contents не создаёт box → не становится containing-block для fixed. */
+/* Умная строка нейропомощника: клавиша (.aik-stage) + пилюля (.nb-pill, разметка по
+   Figma node 312:31933/312:31934) + Spotlight (.spot) + фуллскрин-чат (.chat).
+   Поведение — в useNeuroBar. Обёртка display:contents не создаёт box → не становится
+   containing-block для fixed. */
 
 interface NeuroBarProps extends NeuroBarOpts {
   assetBase?: string;
@@ -18,33 +22,50 @@ export default function NeuroBar({
   assetBase = "/assets/figma/",
 }: NeuroBarProps) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const keyStageRef = useRef<HTMLDivElement>(null);
+  const activateRef = useRef<() => void>(() => {});
   const b = assetBase;
-  useNeuroBar(rootRef, { left, right, bottom });
+  const f = "/assets/ai-field/";
+  useNeuroBar(rootRef, { left, right, bottom, activateRef });
+  useBoardScroll(keyStageRef);
 
   return (
     <div ref={rootRef} style={{ display: "contents" }}>
       {/* ── строка ── */}
       <div className="nbar">
+        <div className="nb-key" ref={keyStageRef}>
+          <AiKeyButton onActivate={() => activateRef.current()} />
+        </div>
         <div className="nb-pill">
-          <span className="nb-clip">
-            <img src={`${b}m2NbClip.svg`} alt="" width="24" height="24" />
-          </span>
-          <input
-            className="nb-input"
-            type="text"
-            placeholder="Как открыть депозит"
-            aria-label="Спросите нейропомощника"
-          />
-          <button className="nb-go" aria-label="Открыть нейропомощника">
-            <img className="nb-ai" src={`${b}m2NbAi.png`} alt="" width="52" height="52" />
-            <img
-              className="nb-search"
-              src={`${b}m2NbSearch.png`}
-              alt=""
-              width="52"
-              height="52"
+          <div className="nb-row1">
+            <input
+              className="nb-input"
+              type="text"
+              placeholder="Сделай красиво"
+              aria-label="Спросите нейропомощника"
             />
-          </button>
+            <span className="nb-voice-hint">
+              <img src={`${f}voice-hint.svg`} alt="" width="24" height="24" />
+            </span>
+            <div className="nb-eq" aria-hidden="true">
+              {Array.from({ length: 26 }).map((_, i) => (
+                <span className="nb-eq-col" key={i} />
+              ))}
+            </div>
+          </div>
+          <div className="nb-row2">
+            <button className="nb-clip" type="button" aria-label="Прикрепить файл">
+              <img src={`${f}clip.svg`} alt="" width="24" height="24" />
+            </button>
+            <div className="nb-row2-right">
+              <button className="nb-mic" type="button" aria-label="Голосовой ввод">
+                <img src={`${f}mic.svg`} alt="" width="24" height="24" />
+              </button>
+              <button className="nb-picker" type="button" aria-label="Спросить про блок на странице">
+                <img src={`${f}cursor-click.svg`} alt="" width="24" height="24" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
