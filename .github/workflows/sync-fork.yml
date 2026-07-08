@@ -1,0 +1,22 @@
+name: Sync fork with upstream
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # каждые 6 часов
+  workflow_dispatch: {}      # + возможность запустить вручную из вкладки Actions
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.repository == 'aslanovich/nefor-dash-k'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fast-forward main from FatherofNations/nefor-dash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh repo sync ${{ github.repository }} \
+            --source FatherofNations/nefor-dash \
+            --branch main
