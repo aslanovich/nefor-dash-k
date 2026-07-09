@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { useTools } from "@/components/tools/ToolsProvider";
+import { useClickSound } from "./useClickSound";
 
 /* 3D-клавиша «АИ» — порт alfa-ai-button-three.js (песочница /alfa-ai) на React.
    Сцена/физика те же (пружина нажатия, наклон к курсору через raycast, спарк-частицы);
@@ -16,7 +18,6 @@ const MODEL_URL = "/assets/alfa-ai-button/key_cap__template.glb";
 const SPARKLE_URL = "/assets/alfa-ai-button/sparkle.svg";
 const LABEL_URL = "/assets/alfa-ai-button/ai-letter.svg";
 const SOUND_ROOT = "/assets/sounds/";
-const KEY_SOUND_NAMES = ["key_sound_1", "key_sound_2", "key_sound_3", "key_sound_4"];
 const DRAG_THRESHOLD = 3;
 
 const WIDTH = 256;
@@ -31,6 +32,14 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onActivateRef = useRef(onActivate);
   onActivateRef.current = onActivate;
+  const { soundMode, trailEnabled } = useTools();
+  const soundModeRef = useRef(soundMode);
+  soundModeRef.current = soundMode;
+  const trailEnabledRef = useRef(trailEnabled);
+  trailEnabledRef.current = trailEnabled;
+  const playClickSound = useClickSound();
+  const playClickSoundRef = useRef(playClickSound);
+  playClickSoundRef.current = playClickSound;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -51,23 +60,23 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 
-    // звук клика: пул Audio на вариант (чтобы быстрые клики не обрезали друг друга)
+    // звук клика — общий хук (useClickSound), см. playClickSoundRef. Здесь только
+    // «пасхальный» длинный зацикленный крик петуха — специфика перетаскивания
+    // именно этой клавиши, остальным потребителям звука (теги в picker-mode) не нужна.
     const canOgg = document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"');
     const soundExt = canOgg ? "ogg" : "mp3";
-    const soundBanks = KEY_SOUND_NAMES.map((name) => ({
-      index: 0,
-      pool: Array.from({ length: 3 }, () => {
-        const audio = new Audio(`${SOUND_ROOT}${name}.${soundExt}`);
-        audio.preload = "auto";
-        return audio;
-      }),
-    }));
-    const playRandomKeySound = () => {
-      const bank = soundBanks[Math.floor(Math.random() * soundBanks.length)];
-      const audio = bank.pool[bank.index];
-      bank.index = (bank.index + 1) % bank.pool.length;
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+    const cockLong = new Audio(`${SOUND_ROOT}cock_long_sound.${soundExt}`);
+    cockLong.preload = "auto";
+    cockLong.loop = true;
+
+    const startDragSound = () => {
+      if (soundModeRef.current !== "easter") return;
+      cockLong.currentTime = 0;
+      cockLong.play().catch(() => {});
+    };
+    const stopDragSound = () => {
+      cockLong.pause();
+      cockLong.currentTime = 0;
     };
 
     const scene = new THREE.Scene();
@@ -184,6 +193,38 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
     let dragStartDx = 0;
     let dragStartDy = 0;
 
+    // лёгкий градиентный шлейф во время перетаскивания — непрерывный хвост из
+    // капсул-сегментов между последовательными точками пути (не отдельные пятна:
+    // концы соседних сегментов стыкуются), каждый сам тает и удаляется через ~2.4с
+    const TRAIL_MIN_DIST = 7;
+    let lastTrailPoint: { x: number; y: number } | null = null;
+    const trailEls: HTMLElement[] = [];
+    const spawnTrailSegment = (x1: number, y1: number, x2: number, y2: number) => {
+      if (reducedMotion.matches || !trailEnabledRef.current) return;
+      const dxSeg = x2 - x1;
+      const dySeg = y2 - y1;
+      const dist = Math.hypot(dxSeg, dySeg);
+      const angle = (Math.atan2(dySeg, dxSeg) * 180) / Math.PI;
+      const midX = (x1 + x2) / 2;
+      const midY = (y1 + y2) / 2;
+
+      const el = document.createElement("div");
+      el.className = "aik-trail";
+      el.style.width = `${dist + 20}px`;
+      el.style.left = `${midX}px`;
+      el.style.top = `${midY}px`;
+      el.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+      document.body.appendChild(el);
+      trailEls.push(el);
+      const cleanup = () => {
+        el.remove();
+        const idx = trailEls.indexOf(el);
+        if (idx !== -1) trailEls.splice(idx, 1);
+      };
+      el.addEventListener("animationend", cleanup, { once: true });
+      setTimeout(cleanup, 2600);
+    };
+
     const tiltTarget = { x: 0, z: 0 };
     const MAX_TILT = THREE.MathUtils.degToRad(9);
     const BASE_TOWARD_VIEWER = THREE.MathUtils.degToRad(14);
@@ -213,7 +254,7 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
       clearTimeout(reboundTimer);
       stage?.classList.remove("aik-clicked");
       stage?.classList.add("aik-hovered", "aik-pressed");
-      playRandomKeySound();
+      playClickSoundRef.current();
     };
 
     const particles: Array<{
@@ -272,7 +313,10 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
       // перетаскивания, ведь браузер шлёт click после mouseup независимо от сдвига
       pointerHandledClick = true;
       stage?.classList.remove("aik-pressed", "aik-dragging");
-      if (wasDragging) return; // сдвинули клавишу — не считаем это кликом
+      if (wasDragging) {
+        stopDragSound();
+        return; // сдвинули клавишу — не считаем это кликом
+      }
       activate();
     };
     // страховка на случай, если клик пришёл без pointerdown/pointerup вообще
@@ -283,7 +327,7 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
         pointerHandledClick = false;
         return;
       }
-      playRandomKeySound();
+      playClickSoundRef.current();
       activate();
     };
 
@@ -293,13 +337,25 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
         const moveY = event.clientY - dragStartY;
         if (!dragging && Math.hypot(moveX, moveY) > DRAG_THRESHOLD) {
           dragging = true;
+          // сама кнопка при перетаскивании не проседает и не блюрится — это
+          // визуальный эффект только клика/удержания на месте (см. .aik-pressed)
+          stage?.classList.remove("aik-pressed");
           stage?.classList.add("aik-dragging");
+          lastTrailPoint = { x: event.clientX, y: event.clientY };
+          startDragSound();
         }
         if (dragging) {
           dx = dragStartDx + moveX;
           dy = dragStartDy + moveY;
           stage?.style.setProperty("--dx", `${dx}px`);
           stage?.style.setProperty("--dy", `${dy}px`);
+          if (lastTrailPoint) {
+            const d = Math.hypot(event.clientX - lastTrailPoint.x, event.clientY - lastTrailPoint.y);
+            if (d > TRAIL_MIN_DIST) {
+              spawnTrailSegment(lastTrailPoint.x, lastTrailPoint.y, event.clientX, event.clientY);
+              lastTrailPoint = { x: event.clientX, y: event.clientY };
+            }
+          }
         }
       }
       const hit = pickKey(event);
@@ -331,6 +387,7 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
       dragStartDx = dx;
       dragStartDy = dy;
       dragging = false;
+      lastTrailPoint = null;
       press();
     };
     const onPointerUp = () => release();
@@ -349,6 +406,9 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
     };
     const onBlur = () => {
       pressed = false;
+      if (dragging) stopDragSound();
+      dragging = false;
+      stage?.classList.remove("aik-pressed", "aik-dragging");
     };
 
     canvas.addEventListener("pointermove", onPointerMove);
@@ -445,7 +505,8 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
         p.sprite.material.dispose();
       });
       disposables.forEach((d) => d.dispose());
-      soundBanks.forEach((bank) => bank.pool.forEach((audio) => audio.pause()));
+      cockLong.pause();
+      trailEls.forEach((el) => el.remove());
       renderer.dispose();
     };
   }, []);

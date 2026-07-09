@@ -34,7 +34,19 @@ function Row({
 
 export default function ToolsPanel() {
   const router = useRouter();
-  const { dashboard, variant, setVariant, v2State, setV2, panelOpen, setPanelOpen } = useTools();
+  const {
+    dashboard,
+    variant,
+    setVariant,
+    v2State,
+    setV2,
+    panelOpen,
+    setPanelOpen,
+    soundMode,
+    setSoundMode,
+    trailEnabled,
+    setTrailEnabled,
+  } = useTools();
 
   return (
     <>
@@ -78,6 +90,33 @@ export default function ToolsPanel() {
           </>
         )}
 
+        {dashboard === "main" && variant === "v1" && (
+          <p className="twk-hint">
+            Переключите вид меню на <b>v2</b>, чтобы настраивать состояния стека счётов.
+          </p>
+        )}
+
+        {/* ── звук клавиши АИ + хвост при перетаскивании: общее для ИП и Бухгалтера ── */}
+        <p className="twk-sec">Звук</p>
+        <div className="twk-seg">
+          <button
+            className={soundMode === "standard" ? "active" : ""}
+            onClick={() => setSoundMode("standard")}
+          >
+            Стандартный
+          </button>
+          <button
+            className={soundMode === "easter" ? "active" : ""}
+            onClick={() => setSoundMode("easter")}
+          >
+            Пасхальный
+          </button>
+        </div>
+        <label className="twk-row">
+          <Switch on={trailEnabled} onChange={setTrailEnabled} />
+          <span className="lb">Хвост при перетаскивании</span>
+        </label>
+
         {/* ── параметры: v2-стек ── */}
         {dashboard === "main" && variant === "v2" && (
           <>
@@ -91,12 +130,6 @@ export default function ToolsPanel() {
             <Row label="Кредит наличными" k="credit" v2State={v2State} setV2={setV2} />
             <Row label="Баллы" k="points" v2State={v2State} setV2={setV2} />
           </>
-        )}
-
-        {dashboard === "main" && variant === "v1" && (
-          <p className="twk-hint">
-            Переключите вид меню на <b>v2</b>, чтобы настраивать состояния стека счётов.
-          </p>
         )}
 
         {dashboard === "current" && (

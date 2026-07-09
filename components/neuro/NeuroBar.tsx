@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { useNeuroBar, NeuroBarOpts } from "./useNeuroBar";
 import AiKeyButton from "./AiKeyButton";
 import { useBoardScroll } from "./useBoardScroll";
+import { useClickSound } from "./useClickSound";
 import "@/styles/ai-key.css";
 import "@/styles/neuro-bar.css";
 
@@ -26,7 +27,8 @@ export default function NeuroBar({
   const activateRef = useRef<() => void>(() => {});
   const b = assetBase;
   const f = "/assets/ai-field/";
-  useNeuroBar(rootRef, { left, right, bottom, activateRef });
+  const playClickSound = useClickSound();
+  useNeuroBar(rootRef, { left, right, bottom, activateRef, playClickSound });
   useBoardScroll(keyStageRef);
 
   return (

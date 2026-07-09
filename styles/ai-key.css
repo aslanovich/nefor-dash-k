@@ -60,9 +60,10 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: 34px 34px 29px 29px;
+  border-radius: 17px 17px 14px 14px;
   transform: translateY(0) scale(1);
-  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.25, 1), filter 0.14s ease-out;
+  filter: blur(0);
+  transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.25, 1), filter 0.16s ease-out;
   will-change: transform, filter;
 
   /* скролл-параллакс + едва заметная деформация: сдвиг и лёгкий skew/scaleY от --sv */
@@ -74,17 +75,25 @@
   filter: saturate(1.08) contrast(1.02);
   transform: translateY(1px) scale(1);
 }
+/* нажатие: явно проседает — примерно на половину своей высоты, будто утопает в
+   интерфейсе (без блюра — раньше эффект нажатия читался только по звуку) */
 .aik-stage.aik-pressed .aik-canvas-mask {
-  filter: saturate(1.14) brightness(0.98) contrast(1.03);
-  transform: translateY(8px) scale(0.965);
+  filter: saturate(1.1) brightness(0.94) contrast(1.03);
+  transform: translateY(40px) scale(0.86);
+}
+/* во время перетаскивания кнопка едет за курсором как есть — не проседает,
+   не блюрится (это отдельное состояние от «нажать и держать на месте») */
+.aik-stage.aik-dragging .aik-canvas-mask {
+  filter: none;
+  transform: translateY(0) scale(1);
 }
 .aik-stage.aik-clicked .aik-canvas-mask {
-  animation: aik-rebound 340ms cubic-bezier(0.24, 0.86, 0.32, 1);
+  animation: aik-rebound 380ms cubic-bezier(0.24, 0.86, 0.32, 1);
 }
 @keyframes aik-rebound {
-  0% { transform: translateY(8px) scale(0.965); }
-  48% { transform: translateY(-3px) scale(1.018); }
-  72% { transform: translateY(1px) scale(0.994); }
+  0% { transform: translateY(40px) scale(0.86); }
+  55% { transform: translateY(-5px) scale(1.02); }
+  78% { transform: translateY(2px) scale(0.994); }
   100% { transform: translateY(0) scale(1); }
 }
 
@@ -105,6 +114,34 @@
 .aik-canvas:focus-visible {
   outline: 3px solid #2a5bd7;
   outline-offset: -6px;
+}
+
+/* лёгкий градиентный хвост при перетаскивании — непрерывная полоса из капсул
+   между точками пути (AiKeyButton.tsx: spawnTrailSegment; ширина/поворот —
+   инлайн-стиль per-элемент, здесь только высота и затухание). Каждый сегмент
+   сам тает и удаляет себя за ~2.4с; соседние сегменты стыкуются по концам,
+   поэтому визуально это единый хвост, а не отдельные пятна. */
+.aik-trail {
+  position: fixed;
+  z-index: 59;
+  height: 15px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 77, 126, 0.38) 18%,
+    rgba(255, 150, 182, 0.32) 50%,
+    rgba(242, 188, 31, 0.34) 82%,
+    transparent 100%
+  );
+  filter: blur(3.5px);
+  opacity: 0.65;
+  pointer-events: none;
+  animation: aik-trail-fade 2.2s ease-out forwards;
+}
+@keyframes aik-trail-fade {
+  0% { opacity: 0.65; }
+  100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

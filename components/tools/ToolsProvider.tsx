@@ -18,6 +18,7 @@ import ToolsPanel from "./ToolsPanel";
 
 export type Variant = "v1" | "v2";
 export type Dashboard = "main" | "current";
+export type SoundMode = "standard" | "easter";
 export interface V2State {
   over: boolean;
   lock: boolean;
@@ -43,6 +44,10 @@ interface ToolsCtx {
   setV2: (k: keyof V2State, val: boolean) => void;
   panelOpen: boolean;
   setPanelOpen: (o: boolean) => void;
+  soundMode: SoundMode;
+  setSoundMode: (m: SoundMode) => void;
+  trailEnabled: boolean;
+  setTrailEnabled: (v: boolean) => void;
 }
 
 const Ctx = createContext<ToolsCtx | null>(null);
@@ -59,6 +64,8 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
   const [variant, setVariant] = useState<Variant>("v1");
   const [v2State, setV2State] = useState<V2State>(DEFAULT_V2);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [soundMode, setSoundMode] = useState<SoundMode>("standard");
+  const [trailEnabled, setTrailEnabled] = useState(false);
   const setV2 = useCallback(
     (k: keyof V2State, val: boolean) => setV2State((s) => ({ ...s, [k]: val })),
     []
@@ -86,7 +93,19 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
 
   return (
     <Ctx.Provider
-      value={{ dashboard, variant, setVariant, v2State, setV2, panelOpen, setPanelOpen }}
+      value={{
+        dashboard,
+        variant,
+        setVariant,
+        v2State,
+        setV2,
+        panelOpen,
+        setPanelOpen,
+        soundMode,
+        setSoundMode,
+        trailEnabled,
+        setTrailEnabled,
+      }}
     >
       <div className="board">{children}</div>
       <ToolsPanel />

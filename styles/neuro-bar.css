@@ -44,6 +44,12 @@ body.twk-open .nbar { right: 344px; }
   bottom: 0;
   box-sizing: border-box;
   width: min(833px, 100%);
+  /* высота задана явно (12+24+22+32+12), не авто — .nb-row2 вынесен из потока
+     (position:absolute, прижат к низу), иначе row1 не может по-честному
+     центрироваться по всей пилюле: рост row1 не меняет отступ до центра, пока
+     row2+gap сидят в общем flex-потоке (это фиксированная величина независимо
+     от высоты row1). Строка ниже. */
+  height: 102px;
   padding: 12px 20px;
   display: flex;
   flex-direction: column;
@@ -63,7 +69,9 @@ body.twk-open .nbar { right: 344px; }
 .nbar.active .nb-pill {
   opacity: 1;
   pointer-events: auto;
-  animation: nbPop 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  /* forwards — иначе по завершении анимации transform откатывается к базовому
+     правилу .nb-pill (scale(0.92)), и пилюля через ~1.1с visually «уменьшается» */
+  animation: nbPop 1.1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @keyframes nbPop {
   0%   { transform: translateX(-50%) scale(0.92); }
@@ -76,8 +84,17 @@ body.twk-open .nbar { right: 344px; }
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-height: 24px;
+}
+/* flex:1 — ТОЛЬКО в voice-режиме (пилюля выше, см. .nbar.voice-on .nb-pill):
+   растягивает row1 на всю добавленную высоту, чтобы эквалайзер центрировался
+   по всей пилюле. Безусловно применять нельзя — в текстовом режиме это тянуло
+   плейсхолдер/тег вниз, пока row2 (position:absolute, фикс. низ) не двигался
+   в ответ, и они налезали друг на друга. */
+.nbar.voice-on .nb-row1 {
+  flex: 1;
 }
 .nb-input {
   flex: 1;
@@ -115,6 +132,12 @@ body.twk-open .nbar { right: 344px; }
 .nbar.voice-on .nb-eq { display: flex; }
 .nbar.voice-on .nb-input,
 .nbar.voice-on .nb-voice-hint { display: none; }
+/* в voice-режиме пилюля выше — иначе эквалайзеру физически негде центрироваться
+   (row1 просто равен своему минимуму, как в текстовом режиме); row1 (flex:1)
+   забирает всю добавленную высоту и центрирует в ней эквалайзер по вертикали */
+.nbar.voice-on .nb-pill {
+  height: 140px;
+}
 .nb-eq-col {
   --v: 0;
   flex: none;
@@ -128,10 +151,15 @@ body.twk-open .nbar { right: 344px; }
 
 /* ── ряд 2: скрепка / микрофон / курсор-выбор блока ── */
 .nb-row2 {
+  /* вне flex-потока пилюли (прижат к низу напрямую) — иначе его высота+gap
+     всегда тянут центр row1 вверх независимо от роста row1, см. .nb-pill */
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 12px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
 }
 .nb-row2-right { display: flex; align-items: center; gap: 8px; }
 .nb-clip, .nb-mic, .nb-picker {
@@ -164,7 +192,8 @@ body.twk-open .nbar { right: 344px; }
 
 /* ── тег выбранного блока страницы (режим-курсор, п.5) ── */
 .nb-tag {
-  align-self: flex-start;
+  /* внутри row1 (ряд), не отдельная строка над ней — центрируется по вертикали
+     вместе с инпутом через align-items:center родителя */
   flex: none;
   display: inline-flex;
   align-items: center;

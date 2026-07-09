@@ -14,6 +14,10 @@ export interface NeuroBarOpts {
   right?: string;
   bottom?: string;
   activateRef?: RefObject<() => void>;
+  /* звук клика — общий хук useClickSound (клавиатура/пасхальный крик по
+     переключателю «Звук»); используется тут для клика по блоку в режиме-курсоре
+     и для удаления тега — не для самой клавиши АИ, у той свой экземпляр хука */
+  playClickSound?: () => void;
 }
 
 const VOICE_PHRASES = [
@@ -28,7 +32,7 @@ export function useNeuroBar(
   rootRef: RefObject<HTMLElement | null>,
   opts: NeuroBarOpts = {}
 ) {
-  const { left, right, bottom, activateRef } = opts;
+  const { left, right, bottom, activateRef, playClickSound } = opts;
 
   useEffect(() => {
     const root = rootRef.current;
@@ -40,6 +44,7 @@ export function useNeuroBar(
     const nbar = q<HTMLElement>(".nbar");
     const nbKey = q<HTMLElement>(".nb-key");
     const nbPill = q<HTMLElement>(".nb-pill");
+    const nbRow1 = q<HTMLElement>(".nb-row1");
     const nbInput = q<HTMLInputElement>(".nb-input");
     const nbMic = q<HTMLButtonElement>(".nb-mic");
     const nbPicker = q<HTMLButtonElement>(".nb-picker");
@@ -173,11 +178,15 @@ export function useNeuroBar(
         x.textContent = "×";
         x.addEventListener("click", (ev) => {
           ev.stopPropagation();
+          playClickSound?.();
           removeTag();
         });
         tag.appendChild(lb);
         tag.appendChild(x);
-        nbPill.insertBefore(tag, nbPill.firstChild);
+        // внутрь row1 (рядом с инпутом), не отдельной строкой над ней — иначе
+        // тег толкает row1 вниз, а row2 (position:absolute, фикс. по низу
+        // пилюли) не подвинется в ответ, и они налезают друг на друга
+        nbRow1.insertBefore(tag, nbRow1.firstChild);
       }
       (tag.querySelector(".nb-tag-lb") as HTMLElement).textContent = label;
       nbActivate();
@@ -471,6 +480,7 @@ export function useNeuroBar(
       if (!el) return;
       e.preventDefault();
       e.stopPropagation();
+      playClickSound?.();
       addTag(el.dataset.aiBlock || "");
       setPicker(false);
     };
@@ -565,5 +575,5 @@ export function useNeuroBar(
       }
       if (activateRef) activateRef.current = () => {};
     };
-  }, [rootRef, left, right, bottom, activateRef]);
+  }, [rootRef, left, right, bottom, activateRef, playClickSound]);
 }
