@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   ReactNode,
 } from "react";
@@ -34,6 +35,8 @@ const DEFAULT_V2: V2State = {
   credit: true,
   points: true,
 };
+// порядок ключей стека для сериализации в ?stack=
+const V2_KEYS: (keyof V2State)[] = ["over", "usd", "lock", "clock", "credit", "points"];
 
 interface ToolsCtx {
   dashboard: Dashboard;
@@ -63,6 +66,48 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
     (k: keyof V2State, val: boolean) => setV2State((s) => ({ ...s, [k]: val })),
     []
   );
+
+  /* ── связь состояния панели с URL (deep-link, без перезагрузки) ──
+     variant (v1/v2) и стек v2 живут в контексте → в ссылку их кладём сами:
+     при заходе по прямой ссылке один раз читаем ?menu/?stack, дальше — плавно
+     пишем текущее состояние через history.replaceState (без навигации/ре-фетча,
+     Next 15 это поддерживает). Дашборд уже в пути (/ и /current). */
+  const urlSynced = useRef(false);
+
+  // старт: применяем параметры из ссылки один раз (тем же переключателем, что и панель)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const menu = sp.get("menu");
+    if (menu === "v1" || menu === "v2") setVariant(menu);
+    if (sp.has("stack")) {
+      const on = new Set((sp.get("stack") ?? "").split(",").filter(Boolean));
+      setV2State({
+        over: on.has("over"),
+        usd: on.has("usd"),
+        lock: on.has("lock"),
+        clock: on.has("clock"),
+        credit: on.has("credit"),
+        points: on.has("points"),
+      });
+    }
+    urlSynced.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // синхронизация: пишем текущее состояние в адресную строку без перезагрузки
+  useEffect(() => {
+    if (!urlSynced.current) return;
+    let url = pathname || "/";
+    if (dashboard === "main") {
+      url =
+        variant === "v2"
+          ? `/?menu=v2&stack=${V2_KEYS.filter((k) => v2State[k]).join(",")}`
+          : "/"; // v1 — чистая ссылка (дефолт)
+    } // current — путь /current без параметров
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [dashboard, variant, v2State, pathname]);
 
   // класс дашборда на body (скоуп для push/scale правил)
   useEffect(() => {
