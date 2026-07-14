@@ -144,6 +144,25 @@
   100% { opacity: 0; }
 }
 
+/* ── тёмная тема (тумблер «Оформление» в панели, скоуп body.aik-dark) ──
+   Сам keycap перекрашивается в чёрный на уровне вершинных цветов (keyCapMesh.ts,
+   palette "dark"), а не контейнер — здесь глоу под клавишей и хвост перетаскивания
+   перекрашиваются в графит, чтобы не спорили с чёрной кнопкой. */
+body.aik-dark .aik-stage::before {
+  background:
+    radial-gradient(ellipse at 50% 60%, rgba(120, 120, 130, 0.5) 0%, rgba(120, 120, 130, 0.28) 40%, transparent 72%);
+}
+body.aik-dark .aik-trail {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(30, 30, 38, 0.55) 18%,
+    rgba(70, 70, 82, 0.45) 50%,
+    rgba(15, 15, 20, 0.5) 82%,
+    transparent 100%
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   .aik-stage, .aik-stage::before, .aik-canvas-mask {
     transition: none;

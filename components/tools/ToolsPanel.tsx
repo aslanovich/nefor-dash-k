@@ -42,10 +42,10 @@ export default function ToolsPanel() {
     setV2,
     panelOpen,
     setPanelOpen,
-    soundMode,
-    setSoundMode,
     trailEnabled,
     setTrailEnabled,
+    keyTheme,
+    setKeyTheme,
   } = useTools();
 
   return (
@@ -96,22 +96,8 @@ export default function ToolsPanel() {
           </p>
         )}
 
-        {/* ── звук клавиши АИ + хвост при перетаскивании: общее для ИП и Бухгалтера ── */}
-        <p className="twk-sec">Звук</p>
-        <div className="twk-seg">
-          <button
-            className={soundMode === "standard" ? "active" : ""}
-            onClick={() => setSoundMode("standard")}
-          >
-            Стандартный
-          </button>
-          <button
-            className={soundMode === "easter" ? "active" : ""}
-            onClick={() => setSoundMode("easter")}
-          >
-            Пасхальный
-          </button>
-        </div>
+        {/* ── хвост клавиши АИ при перетаскивании: общее для ИП и Бухгалтера ── */}
+        <p className="twk-sec">Кнопка АИ</p>
         <label className="twk-row">
           <Switch on={trailEnabled} onChange={setTrailEnabled} />
           <span className="lb">Хвост при перетаскивании</span>
@@ -137,6 +123,13 @@ export default function ToolsPanel() {
             Дашборд <b>Current</b> — новый макет. Параметры появятся в следующей итерации.
           </p>
         )}
+
+        {/* ── оформление клавиши+строки: тёмная тема (в самом конце) ── */}
+        <p className="twk-sec">Оформление</p>
+        <label className="twk-row">
+          <Switch on={keyTheme === "dark"} onChange={(v) => setKeyTheme(v ? "dark" : "light")} />
+          <span className="lb">Тёмная тема</span>
+        </label>
       </aside>
 
       {/* ── плавающая кнопка (иконка морфится в крестик) ── */}

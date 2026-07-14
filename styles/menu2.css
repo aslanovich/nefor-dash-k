@@ -444,9 +444,6 @@ body.twk-open .twk { transform: none; }
   cursor: pointer;
 }
 .twk-row:last-child { border-bottom: none; }
-/* строка сразу после сегмент-переключателя (без своего .twk-sec, напр. «Хвост
-   при перетаскивании» под «Звук») — тот же отступ, что и перед новой секцией */
-.twk-seg + .twk-row { margin-top: 36px; }
 .twk-row .lb {
   font-size: 15px;
   line-height: 20px;

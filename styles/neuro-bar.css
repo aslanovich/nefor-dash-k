@@ -222,6 +222,33 @@ body.twk-open .nbar { right: 344px; }
 }
 .nb-tag-x:hover { background: rgba(239, 49, 36, 0.16); }
 
+/* ═══════════ Тёмная тема клавиши+строки (тумблер «Оформление» в панели) ═══════════
+   Скоуп — body.aik-dark (ставит ToolsProvider). НАМЕРЕННО только пилюля и клавиша
+   (.aik-* в ai-key.css); фуллскрин-чат .chat под этот скоуп не попадает и остаётся
+   светлым. */
+body.aik-dark .nb-pill {
+  background-image:
+    linear-gradient(90deg, rgba(255, 92, 140, 0.08) 0%, rgba(255, 92, 140, 0.08) 100%),
+    linear-gradient(90deg, rgba(22, 22, 27, 0.86) 0%, rgba(22, 22, 27, 0.86) 100%);
+  box-shadow: 0 26.545px 33.531px rgba(0, 0, 0, 0.4), inset -2.794px 1.397px 5.588px rgba(229, 91, 141, 0.45);
+}
+body.aik-dark .nb-input { color: rgba(255, 255, 255, 0.92); }
+body.aik-dark .nb-input::placeholder { color: rgba(255, 255, 255, 0.42); }
+/* иконки-ряда — исходные SVG с чёрной заливкой; в тёмной теме перекрашиваем в белый */
+body.aik-dark .nb-clip img,
+body.aik-dark .nb-mic img,
+body.aik-dark .nb-picker img,
+body.aik-dark .nb-voice-hint img {
+  filter: brightness(0) invert(1);
+}
+body.aik-dark .nb-clip:hover,
+body.aik-dark .nb-mic:hover,
+body.aik-dark .nb-picker:hover { background: rgba(255, 255, 255, 0.1); }
+body.aik-dark .nb-mic.active,
+body.aik-dark .nb-picker.active { background: rgba(239, 49, 36, 0.28); }
+body.aik-dark .nb-tag { background: rgba(239, 49, 36, 0.24); color: #ff8a80; }
+body.aik-dark .nb-tag-x:hover { background: rgba(239, 49, 36, 0.32); }
+
 /* ── активация режима-курсора (п.5): подсветка блоков по ховеру ── */
 body.picker-open [data-ai-block] { cursor: crosshair; }
 [data-ai-block] { transition: outline-color 0.15s ease, background-color 0.15s ease; }

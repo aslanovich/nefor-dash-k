@@ -19,7 +19,7 @@ import ToolsPanel from "./ToolsPanel";
 
 export type Variant = "v1" | "v2";
 export type Dashboard = "main" | "current";
-export type SoundMode = "standard" | "easter";
+export type KeyTheme = "light" | "dark";
 export interface V2State {
   over: boolean;
   lock: boolean;
@@ -47,10 +47,10 @@ interface ToolsCtx {
   setV2: (k: keyof V2State, val: boolean) => void;
   panelOpen: boolean;
   setPanelOpen: (o: boolean) => void;
-  soundMode: SoundMode;
-  setSoundMode: (m: SoundMode) => void;
   trailEnabled: boolean;
   setTrailEnabled: (v: boolean) => void;
+  keyTheme: KeyTheme;
+  setKeyTheme: (t: KeyTheme) => void;
 }
 
 const Ctx = createContext<ToolsCtx | null>(null);
@@ -67,8 +67,8 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
   const [variant, setVariant] = useState<Variant>("v1");
   const [v2State, setV2State] = useState<V2State>(DEFAULT_V2);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [soundMode, setSoundMode] = useState<SoundMode>("standard");
   const [trailEnabled, setTrailEnabled] = useState(false);
+  const [keyTheme, setKeyTheme] = useState<KeyTheme>("light");
   const setV2 = useCallback(
     (k: keyof V2State, val: boolean) => setV2State((s) => ({ ...s, [k]: val })),
     []
@@ -122,6 +122,12 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
     document.body.classList.toggle("dash-current", dashboard === "current");
   }, [dashboard]);
 
+  // тёмная тема клавиши+строки (не полноэкранного чата): body.aik-dark — скоуп для
+  // dark-оверрайдов в neuro-bar.css / ai-key.css; .chat под него намеренно не попадает
+  useEffect(() => {
+    document.body.classList.toggle("aik-dark", keyTheme === "dark");
+  }, [keyTheme]);
+
   // открытая панель: body.twk-open (рамка-обрезка вьюпорта борда — чистый CSS, styles/tools.css)
   useEffect(() => {
     document.body.classList.toggle("twk-open", panelOpen);
@@ -146,10 +152,10 @@ export default function ToolsProvider({ children }: { children: ReactNode }) {
         setV2,
         panelOpen,
         setPanelOpen,
-        soundMode,
-        setSoundMode,
         trailEnabled,
         setTrailEnabled,
+        keyTheme,
+        setKeyTheme,
       }}
     >
       <div className="board">{children}</div>

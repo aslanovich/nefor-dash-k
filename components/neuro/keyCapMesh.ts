@@ -2,10 +2,55 @@ import * as THREE from "three";
 
 /* Загрузка и «запекание» раскраски 3D-клавиши «АИ» — чистая (без React) часть
    AiKeyButton: разбор GLB вручную (без GLTFLoader) и покраска вершин по позиции/
-   нормали (розово-малиновый верх, красно-золотая боковина). Вынесено из компонента,
-   т.к. это самодостаточная геометрия/парсинг, а не UI-логика. */
+   нормали. Две палитры: светлая (розово-малиновый верх, красно-золотая боковина)
+   и тёмная (чёрный keycap) — переключаются тумблером «Оформление» без перезагрузки
+   GLB (меняется только атрибут color, см. applyKeyTheme). */
 
 const LABEL_URL = "/assets/alfa-ai-button/ai-letter.svg";
+
+export type KeyMeshTheme = "light" | "dark";
+
+interface Palette {
+  topA: string;      // верхняя грань, дальний край
+  topB: string;      // верхняя грань, ближний край
+  sideTop: string;   // боковина у верха
+  sideMid: string;   // боковина в середине
+  sideBottom: string;// боковина у низа
+  highlight: string; // блик на верхней грани
+  highlightK: number;// сила блика
+}
+const PALETTES: Record<KeyMeshTheme, Palette> = {
+  light: {
+    topA: "#d8004e",
+    topB: "#ff5f9f",
+    sideTop: "#c60038",
+    sideMid: "#ff315f",
+    sideBottom: "#f2bc1f",
+    highlight: "#ffffff",
+    highlightK: 0.08,
+  },
+  // чёрный keycap: графитовый градиент верх→низ, тонкий белый блик сверху
+  dark: {
+    topA: "#191920",
+    topB: "#34343d",
+    sideTop: "#101014",
+    sideMid: "#1c1c22",
+    sideBottom: "#050507",
+    highlight: "#ffffff",
+    highlightK: 0.12,
+  },
+};
+
+/* Обновить цвет keycap под тему без перезагрузки GLB — свап атрибута color на
+   заранее посчитанный набор (обе палитры лежат в KeyMeshData.colors). */
+export function applyKeyTheme(data: KeyMeshData, theme: KeyMeshTheme) {
+  data.mesh.geometry.setAttribute("color", new THREE.BufferAttribute(data.colors[theme], 3));
+}
+
+export interface KeyMeshData {
+  mesh: THREE.Mesh;
+  colors: Record<KeyMeshTheme, Float32Array>;
+}
 
 // надпись «аи✦» на верхней грани — canvas-текстура (SVG → 2D-canvas → THREE)
 export function makeLabelTexture(
@@ -34,7 +79,7 @@ export function makeLabelTexture(
   return texture;
 }
 
-export async function loadKeyCapMesh(url: string): Promise<THREE.Mesh> {
+export async function loadKeyCapMesh(url: string, theme: KeyMeshTheme = "light"): Promise<KeyMeshData> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`GLB request failed: ${response.status}`);
   const buffer = await response.arrayBuffer();
@@ -56,46 +101,30 @@ export async function loadKeyCapMesh(url: string): Promise<THREE.Mesh> {
   const centerY = (bounds.min[1] + bounds.max[1]) / 2;
 
   const scale = 210 / Math.max(sizeX, sizeY); // единый масштаб по всем осям
-  const modelWidth = sizeX * scale;
-  const modelDepth = sizeY * scale;
-  const modelHeight = (bounds.max[2] - bounds.min[2] || 1) * scale;
+  const dims = {
+    width: sizeX * scale,
+    depth: sizeY * scale,
+    height: (bounds.max[2] - bounds.min[2] || 1) * scale,
+  };
 
+  // геометрия (позиции/нормали, GLB Y-up → сцена Z-up) считается один раз;
+  // раскраска — по разу на палитру поверх готовых позиций/нормалей
   const positions = new Float32Array(count * 3);
   const normals = normalSource ? new Float32Array(count * 3) : null;
-  const colors = new Float32Array(count * 3);
-  const topA = new THREE.Color("#d8004e");
-  const topB = new THREE.Color("#ff5f9f");
-  const sideTop = new THREE.Color("#c60038");
-  const sideMid = new THREE.Color("#ff315f");
-  const sideBottom = new THREE.Color("#f2bc1f");
-  const white = new THREE.Color("#ffffff");
-  const color = new THREE.Color();
-  const top = new THREE.Color();
-  const side = new THREE.Color();
-  const lower = new THREE.Color();
-
   for (let i = 0; i < count; i++) {
     const sx = sourcePos[i * 3];
     const sy = sourcePos[i * 3 + 1];
     const sz = sourcePos[i * 3 + 2];
-    const x = (sx - centerX) * scale;
-    const y = (sz - bounds.min[2]) * scale;
-    const z = -(sy - centerY) * scale;
+    positions[i * 3] = (sx - centerX) * scale;
+    positions[i * 3 + 1] = (sz - bounds.min[2]) * scale;
+    positions[i * 3 + 2] = -(sy - centerY) * scale;
 
-    positions[i * 3] = x;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = z;
-
-    let nx = 0;
-    let ny = 1;
-    let nz = 0;
     if (normalSource) {
-      const normalArray = normalSource.array as Float32Array;
-      // GLB Y-up → сцена Z-up (те же оси, что у позиций выше); масштаб одинаков,
-      // поэтому нормали лишь переставляются/инвертируются и ре-нормализуются
-      nx = normalArray[i * 3];
-      ny = normalArray[i * 3 + 2];
-      nz = -normalArray[i * 3 + 1];
+      const n = normalSource.array as Float32Array;
+      // масштаб одинаков по осям → нормали лишь переставляются и ре-нормализуются
+      let nx = n[i * 3];
+      let ny = n[i * 3 + 2];
+      let nz = -n[i * 3 + 1];
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len;
       ny /= len;
@@ -104,38 +133,16 @@ export async function loadKeyCapMesh(url: string): Promise<THREE.Mesh> {
       normals![i * 3 + 1] = ny;
       normals![i * 3 + 2] = nz;
     }
-
-    const height = THREE.MathUtils.clamp(y / modelHeight, 0, 1);
-    const topMix = THREE.MathUtils.clamp((x / modelWidth + 0.5) * 0.52 + (z / modelDepth + 0.5) * 0.48, 0, 1);
-    const upness = THREE.MathUtils.clamp((ny - 0.1) / 0.76, 0, 1);
-    const frontness = THREE.MathUtils.clamp((z - modelDepth * 0.08) / (modelDepth * 0.42), 0, 1);
-
-    top.lerpColors(topA, topB, topMix);
-    lower.lerpColors(sideBottom, sideMid, height);
-    side.lerpColors(lower, sideTop, Math.max(0, height - 0.45) / 0.55);
-    side.lerp(sideBottom, Math.pow(frontness, 1.05) * (1 - upness) * 0.48);
-    color.lerpColors(side, top, upness);
-
-    const glow = Math.max(
-      0,
-      1 -
-        Math.hypot(
-          (x - modelWidth * 0.2) / (modelWidth * 0.42),
-          (z + modelDepth * 0.03) / (modelDepth * 0.38)
-        )
-    );
-    if (upness > 0.62 && glow > 0) {
-      color.lerp(white, glow * 0.08 * upness);
-    }
-
-    colors[i * 3] = color.r;
-    colors[i * 3 + 1] = color.g;
-    colors[i * 3 + 2] = color.b;
   }
+
+  const colors: Record<KeyMeshTheme, Float32Array> = {
+    light: buildColors(positions, normals, dims, PALETTES.light),
+    dark: buildColors(positions, normals, dims, PALETTES.dark),
+  };
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors[theme], 3));
   if (normals) {
     geometry.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
   } else {
@@ -151,7 +158,7 @@ export async function loadKeyCapMesh(url: string): Promise<THREE.Mesh> {
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
 
-  return new THREE.Mesh(
+  const mesh = new THREE.Mesh(
     geometry,
     new THREE.MeshStandardMaterial({
       vertexColors: true,
@@ -160,6 +167,59 @@ export async function loadKeyCapMesh(url: string): Promise<THREE.Mesh> {
       side: THREE.DoubleSide,
     })
   );
+  return { mesh, colors };
+}
+
+// вершинные цвета для одной палитры: градиент верх/боковина по позиции+нормали
+function buildColors(
+  positions: Float32Array,
+  normals: Float32Array | null,
+  dims: { width: number; depth: number; height: number },
+  palette: Palette
+): Float32Array {
+  const count = positions.length / 3;
+  const out = new Float32Array(count * 3);
+  const topA = new THREE.Color(palette.topA);
+  const topB = new THREE.Color(palette.topB);
+  const sideTop = new THREE.Color(palette.sideTop);
+  const sideMid = new THREE.Color(palette.sideMid);
+  const sideBottom = new THREE.Color(palette.sideBottom);
+  const highlight = new THREE.Color(palette.highlight);
+  const color = new THREE.Color();
+  const top = new THREE.Color();
+  const side = new THREE.Color();
+  const lower = new THREE.Color();
+
+  for (let i = 0; i < count; i++) {
+    const x = positions[i * 3];
+    const y = positions[i * 3 + 1];
+    const z = positions[i * 3 + 2];
+    const ny = normals ? normals[i * 3 + 1] : 1;
+
+    const height = THREE.MathUtils.clamp(y / dims.height, 0, 1);
+    const topMix = THREE.MathUtils.clamp((x / dims.width + 0.5) * 0.52 + (z / dims.depth + 0.5) * 0.48, 0, 1);
+    const upness = THREE.MathUtils.clamp((ny - 0.1) / 0.76, 0, 1);
+    const frontness = THREE.MathUtils.clamp((z - dims.depth * 0.08) / (dims.depth * 0.42), 0, 1);
+
+    top.lerpColors(topA, topB, topMix);
+    lower.lerpColors(sideBottom, sideMid, height);
+    side.lerpColors(lower, sideTop, Math.max(0, height - 0.45) / 0.55);
+    side.lerp(sideBottom, Math.pow(frontness, 1.05) * (1 - upness) * 0.48);
+    color.lerpColors(side, top, upness);
+
+    const glow = Math.max(
+      0,
+      1 - Math.hypot((x - dims.width * 0.2) / (dims.width * 0.42), (z + dims.depth * 0.03) / (dims.depth * 0.38))
+    );
+    if (upness > 0.62 && glow > 0) {
+      color.lerp(highlight, glow * palette.highlightK * upness);
+    }
+
+    out[i * 3] = color.r;
+    out[i * 3 + 1] = color.g;
+    out[i * 3 + 2] = color.b;
+  }
+  return out;
 }
 
 interface GlbJson {

@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useTools } from "@/components/tools/ToolsProvider";
 import { useClickSound } from "./useClickSound";
-import { loadKeyCapMesh, makeLabelTexture } from "./keyCapMesh";
+import { loadKeyCapMesh, makeLabelTexture, applyKeyTheme, KeyMeshData } from "./keyCapMesh";
 
 /* 3D-клавиша «АИ» — порт alfa-ai-button-three.js (песочница /alfa-ai) на React.
    Сцена/физика те же (пружина нажатия, наклон к курсору через raycast, спарк-частицы);
@@ -17,7 +17,6 @@ import { loadKeyCapMesh, makeLabelTexture } from "./keyCapMesh";
 
 const MODEL_URL = "/assets/alfa-ai-button/key_cap__template.glb";
 const SPARKLE_URL = "/assets/alfa-ai-button/sparkle.svg";
-const SOUND_ROOT = "/assets/sounds/";
 const DRAG_THRESHOLD = 3;
 
 const WIDTH = 256;
@@ -32,14 +31,21 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const onActivateRef = useRef(onActivate);
   onActivateRef.current = onActivate;
-  const { soundMode, trailEnabled } = useTools();
-  const soundModeRef = useRef(soundMode);
-  soundModeRef.current = soundMode;
+  const { trailEnabled, keyTheme } = useTools();
   const trailEnabledRef = useRef(trailEnabled);
   trailEnabledRef.current = trailEnabled;
+  const keyThemeRef = useRef(keyTheme);
+  keyThemeRef.current = keyTheme;
   const playClickSound = useClickSound();
   const playClickSoundRef = useRef(playClickSound);
   playClickSoundRef.current = playClickSound;
+  // загруженный меш + оба набора вершинных цветов — общий с эффектом смены темы ниже
+  const meshDataRef = useRef<KeyMeshData | null>(null);
+
+  // перекраска keycap под тему (light/dark) без перезагрузки GLB — свап атрибута color
+  useEffect(() => {
+    if (meshDataRef.current) applyKeyTheme(meshDataRef.current, keyTheme);
+  }, [keyTheme]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,25 +65,6 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-
-    // звук клика — общий хук (useClickSound), см. playClickSoundRef. Здесь только
-    // «пасхальный» длинный зацикленный крик петуха — специфика перетаскивания
-    // именно этой клавиши, остальным потребителям звука (теги в picker-mode) не нужна.
-    const canOgg = document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"');
-    const soundExt = canOgg ? "ogg" : "mp3";
-    const cockLong = new Audio(`${SOUND_ROOT}cock_long_sound.${soundExt}`);
-    cockLong.preload = "auto";
-    cockLong.loop = true;
-
-    const startDragSound = () => {
-      if (soundModeRef.current !== "easter") return;
-      cockLong.currentTime = 0;
-      cockLong.play().catch(() => {});
-    };
-    const stopDragSound = () => {
-      cockLong.pause();
-      cockLong.currentTime = 0;
-    };
 
     const scene = new THREE.Scene();
     const viewHeight = 270;
@@ -159,17 +146,18 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
     let reboundTimer: ReturnType<typeof setTimeout> | undefined;
 
     let cancelled = false;
-    loadKeyCapMesh(MODEL_URL)
-      .then((mesh) => {
+    loadKeyCapMesh(MODEL_URL, keyThemeRef.current)
+      .then((data) => {
         if (cancelled) {
-          mesh.geometry.dispose();
-          (mesh.material as THREE.Material).dispose();
+          data.mesh.geometry.dispose();
+          (data.mesh.material as THREE.Material).dispose();
           return;
         }
-        capMesh = mesh;
+        capMesh = data.mesh;
+        meshDataRef.current = data;
         capGroup.add(capMesh);
         hitTargets.push(capMesh);
-        disposables.push(mesh.geometry, mesh.material as THREE.Material);
+        disposables.push(data.mesh.geometry, data.mesh.material as THREE.Material);
       })
       .catch((error) => {
         console.error("Key cap model failed to load", error);
@@ -313,10 +301,7 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
       // перетаскивания, ведь браузер шлёт click после mouseup независимо от сдвига
       pointerHandledClick = true;
       stage?.classList.remove("aik-pressed", "aik-dragging");
-      if (wasDragging) {
-        stopDragSound();
-        return; // сдвинули клавишу — не считаем это кликом
-      }
+      if (wasDragging) return; // сдвинули клавишу — не считаем это кликом
       activate();
     };
     // страховка на случай, если клик пришёл без pointerdown/pointerup вообще
@@ -342,7 +327,6 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
           stage?.classList.remove("aik-pressed");
           stage?.classList.add("aik-dragging");
           lastTrailPoint = { x: event.clientX, y: event.clientY };
-          startDragSound();
         }
         if (dragging) {
           dx = dragStartDx + moveX;
@@ -406,7 +390,6 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
     };
     const onBlur = () => {
       pressed = false;
-      if (dragging) stopDragSound();
       dragging = false;
       stage?.classList.remove("aik-pressed", "aik-dragging");
     };
@@ -505,7 +488,7 @@ export default function AiKeyButton({ onActivate, className }: AiKeyButtonProps)
         p.sprite.material.dispose();
       });
       disposables.forEach((d) => d.dispose());
-      cockLong.pause();
+      meshDataRef.current = null;
       trailEls.forEach((el) => el.remove());
       renderer.dispose();
     };
