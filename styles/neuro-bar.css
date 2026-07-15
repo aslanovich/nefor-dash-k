@@ -22,6 +22,34 @@
    и под clip-path. Двигается вместе с обрезкой борда. */
 body.twk-open .nbar { right: 344px; }
 
+/* ── тёплая подсветка-подложка под развёрнутой пилюлей ──
+   мягкое радиальное свечение у низа за формой; появляется при развороте
+   (.nbar.active) и плавно гаснет при сворачивании обратно в клавишу. Лежит
+   поверх контента (.nbar z-index 60), но под самой пилюлей (z-index -1 внутри
+   .nbar). position:absolute → вне flex-потока, клавишу не двигает. */
+.nbar::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -120px;
+  transform: translateX(-50%);
+  width: min(1400px, 150vw);
+  height: 620px;
+  background: radial-gradient(
+    62% 62% at 50% 84%,
+    rgba(255, 104, 104, 0.62) 0%,
+    rgba(255, 128, 116, 0.42) 28%,
+    rgba(255, 146, 134, 0.2) 48%,
+    transparent 70%
+  );
+  filter: blur(40px);
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nbar.active::before { opacity: 1; }
+
 /* ── клавиша (идле) — крестфейд с пилюлей при разворote/сворачивании ── */
 .nb-key {
   --mx: 0px;   /* магнит к курсору, пока строка свёрнута (useNeuroBar) */
@@ -225,29 +253,51 @@ body.twk-open .nbar { right: 344px; }
 /* ═══════════ Тёмная тема клавиши+строки (тумблер «Оформление» в панели) ═══════════
    Скоуп — body.aik-dark (ставит ToolsProvider). НАМЕРЕННО только пилюля и клавиша
    (.aik-* в ai-key.css); фуллскрин-чат .chat под этот скоуп не попадает и остаётся
-   светлым. */
+   светлым. Визуал пилюли — в стиле Google Stitch (stitch.withgoogle.com): тёмное
+   стекло с фиолетово-синим ambient-градиентом из верхнего-левого угла и снизу-слева,
+   тонкая светлая рамка, мягкая глубокая тень + верхний внутренний блик. */
 body.aik-dark .nb-pill {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background-color: #0d0d14;
   background-image:
-    linear-gradient(90deg, rgba(255, 92, 140, 0.08) 0%, rgba(255, 92, 140, 0.08) 100%),
-    linear-gradient(90deg, rgba(22, 22, 27, 0.86) 0%, rgba(22, 22, 27, 0.86) 100%);
-  box-shadow: 0 26.545px 33.531px rgba(0, 0, 0, 0.4), inset -2.794px 1.397px 5.588px rgba(229, 91, 141, 0.45);
+    radial-gradient(140% 180% at -8% -60%, rgba(157, 139, 255, 0.5) 0%, rgba(103, 110, 232, 0.22) 30%, transparent 58%),
+    radial-gradient(130% 170% at -2% 150%, rgba(88, 116, 240, 0.28) 0%, transparent 52%);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
-body.aik-dark .nb-input { color: rgba(255, 255, 255, 0.92); }
-body.aik-dark .nb-input::placeholder { color: rgba(255, 255, 255, 0.42); }
-/* иконки-ряда — исходные SVG с чёрной заливкой; в тёмной теме перекрашиваем в белый */
+body.aik-dark .nb-input { color: rgba(255, 255, 255, 0.94); }
+body.aik-dark .nb-input::placeholder { color: rgba(233, 231, 255, 0.45); }
+/* иконки-ряда — исходные SVG с чёрной заливкой; в тёмной теме перекрашиваем в белый
+   и слегка приглушаем (как в Stitch — не чисто-белые, а мягкие) */
 body.aik-dark .nb-clip img,
 body.aik-dark .nb-mic img,
 body.aik-dark .nb-picker img,
 body.aik-dark .nb-voice-hint img {
   filter: brightness(0) invert(1);
+  opacity: 0.82;
 }
 body.aik-dark .nb-clip:hover,
 body.aik-dark .nb-mic:hover,
-body.aik-dark .nb-picker:hover { background: rgba(255, 255, 255, 0.1); }
+body.aik-dark .nb-picker:hover { background: rgba(255, 255, 255, 0.08); }
+/* активные режимы — фиолетовый акцент Stitch вместо алого (на тёмном стекле мягче) */
 body.aik-dark .nb-mic.active,
-body.aik-dark .nb-picker.active { background: rgba(239, 49, 36, 0.28); }
-body.aik-dark .nb-tag { background: rgba(239, 49, 36, 0.24); color: #ff8a80; }
-body.aik-dark .nb-tag-x:hover { background: rgba(239, 49, 36, 0.32); }
+body.aik-dark .nb-picker.active { background: rgba(140, 122, 255, 0.3); }
+body.aik-dark .nb-mic.active { animation: none; }
+body.aik-dark .nb-tag { background: rgba(140, 122, 255, 0.26); color: #c9c2ff; }
+body.aik-dark .nb-tag-x:hover { background: rgba(140, 122, 255, 0.36); }
+/* эквалайзер голосового режима — в фиолет под стать карточке */
+body.aik-dark .nb-eq-col { background: #9d8bff; }
+/* подсветка-подложка — в тёмной теме фиолетовая (тёплая спорила бы с Stitch-картой) */
+body.aik-dark .nbar::before {
+  background: radial-gradient(
+    58% 62% at 50% 82%,
+    rgba(140, 122, 255, 0.5) 0%,
+    rgba(110, 118, 236, 0.3) 32%,
+    rgba(96, 116, 240, 0.12) 55%,
+    transparent 72%
+  );
+}
 
 /* ── активация режима-курсора (п.5): подсветка блоков по ховеру ── */
 body.picker-open [data-ai-block] { cursor: crosshair; }
